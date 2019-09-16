@@ -1160,13 +1160,20 @@ void StokesProblem<dim>::make_grid()
 template <int dim>
 void StokesProblem<dim>::setup_system()
 {
-  TimerOutput::Scope t(computing_timer, "setup");
+  TimerOutput::Scope t(computing_timer, "1.setup");
 
-  dof_handler.distribute_dofs(fe);
+  {
+    TimerOutput::Scope t(computing_timer, "setup:distribute_dofs");
+    dof_handler.distribute_dofs(fe);
+  }
 
   std::vector<unsigned int> stokes_sub_blocks(dim + 1, 0);
   stokes_sub_blocks[dim] = 1;
-  DoFRenumbering::component_wise(dof_handler, stokes_sub_blocks);
+
+  {
+    TimerOutput::Scope t(computing_timer, "setup:renumber");
+    DoFRenumbering::component_wise(dof_handler, stokes_sub_blocks);
+  }
 
   std::vector<types::global_dof_index> dofs_per_block(2);
   DoFTools::count_dofs_per_block(dof_handler,
@@ -1190,6 +1197,7 @@ void StokesProblem<dim>::setup_system()
   relevant_partitioning[1] = locally_relevant_dofs.get_view(n_u, n_u + n_p);
 
   {
+    TimerOutput::Scope t(computing_timer, "setup:constraints");
     constraints.reinit(locally_relevant_dofs);
 
     FEValuesExtractors::Vector velocities(0);
@@ -1213,6 +1221,7 @@ void StokesProblem<dim>::setup_system()
 
   // Velocity DoFHandler
   {
+    TimerOutput::Scope t(computing_timer, "setup:velocity_dofh");
     dof_handler_v.clear();
     dof_handler_v.distribute_dofs(fe_v);
 
@@ -1233,6 +1242,7 @@ void StokesProblem<dim>::setup_system()
 
   // Pressure DoFHandler
   {
+    TimerOutput::Scope t(computing_timer, "setup:pressure_dofh");
     dof_handler_p.clear();
     dof_handler_p.distribute_dofs(fe_p);
 
@@ -1249,6 +1259,7 @@ void StokesProblem<dim>::setup_system()
 
   // Coefficient transfer objects
   {
+    TimerOutput::Scope t(computing_timer, "setup:transfer_dofh");
     dof_handler_projection.clear();
     dof_handler_projection.distribute_dofs(fe_projection);
 
@@ -1258,7 +1269,11 @@ void StokesProblem<dim>::setup_system()
   }
 
   // Multigrid DoF setup
-  dof_handler_v.distribute_mg_dofs();
+
+  {
+    TimerOutput::Scope t(computing_timer, "setup:distribute_mg_dofs");
+    dof_handler_v.distribute_mg_dofs();
+  }
 
   mg_constrained_dofs.clear();
   mg_constrained_dofs.initialize(dof_handler_v);
@@ -1267,11 +1282,15 @@ void StokesProblem<dim>::setup_system()
   dirichlet_boundary.insert(0);
   mg_constrained_dofs.make_zero_boundary_constraints(dof_handler_v, dirichlet_boundary);
 
-  dof_handler_projection.distribute_mg_dofs();
+  {
+    TimerOutput::Scope t(computing_timer, "setup:transfer:distribute_mg_dofs");
+    dof_handler_projection.distribute_mg_dofs();
+  }
 
   // Setup the matrix-free operators
   // Stokes matrix
   {
+    TimerOutput::Scope t(computing_timer, "setup:matrix-free");
     typename MatrixFree<dim,double>::AdditionalData additional_data;
     additional_data.tasks_parallel_scheme =
         MatrixFree<dim,double>::AdditionalData::none;
@@ -1328,6 +1347,7 @@ void StokesProblem<dim>::setup_system()
 
   // GMG matrices
   {
+    TimerOutput::Scope t(computing_timer, "setup:gmg-matrices");
     const unsigned int n_levels = triangulation.n_global_levels();
     mg_matrices.clear_elements();
     mg_matrices.resize(0, n_levels-1);
@@ -1363,9 +1383,14 @@ void StokesProblem<dim>::setup_system()
   }
 
   // Build MG transfer
-  mg_transfer.clear();
-  mg_transfer.initialize_constraints(mg_constrained_dofs);
-  mg_transfer.build(dof_handler_v);
+
+  {
+    TimerOutput::Scope t(computing_timer, "setup:mg_transfer");
+    mg_transfer.clear();
+    mg_transfer.initialize_constraints(mg_constrained_dofs);
+    mg_transfer.build(dof_handler_v);
+  }
+
 }
 
 
@@ -1373,7 +1398,7 @@ void StokesProblem<dim>::setup_system()
 template <int dim>
 void StokesProblem<dim>::assemble_system()
 {
-  TimerOutput::Scope t(computing_timer, "assembly");
+  TimerOutput::Scope t(computing_timer, "2.assembly");
 
   system_rhs            = 0;
 
@@ -1428,6 +1453,8 @@ void StokesProblem<dim>::assemble_system()
 template <int dim>
 void StokesProblem<dim>::evaluate_viscosity ()
 {
+  TimerOutput::Scope t(computing_timer, "3.evaluate_viscosity");
+
   {
     const QGauss<dim> quadrature_formula (velocity_degree+1);
 
@@ -1491,6 +1518,7 @@ void StokesProblem<dim>::evaluate_viscosity ()
 template <int dim>
 void StokesProblem<dim>::correct_stokes_rhs()
 {
+  TimerOutput::Scope t(computing_timer, "4.correct_stokes_rhs");
   dealii::LinearAlgebra::distributed::BlockVector<double> rhs_correction(2);
   dealii::LinearAlgebra::distributed::BlockVector<double> u0(2);
 
@@ -1554,7 +1582,7 @@ void StokesProblem<dim>::correct_stokes_rhs()
 template <int dim>
 void StokesProblem<dim>::solve()
 {
-  TimerOutput::Scope t(computing_timer, "solve");
+  TimerOutput::Scope t(computing_timer, "5.solve");
   Timer timer(mpi_communicator,true);
 
   timer.restart();
@@ -1782,7 +1810,7 @@ void StokesProblem<dim>::solve()
 template <int dim>
 void StokesProblem<dim>::refine_grid()
 {
-  TimerOutput::Scope t(computing_timer, "refine");
+  TimerOutput::Scope t(computing_timer, "6.refine");
 
   triangulation.refine_global();
 }
@@ -1820,6 +1848,8 @@ void StokesProblem<dim>::run()
     solve();
 
     pcout << std::endl;
+    computing_timer.print_summary();
+    computing_timer.reset();
   }
 }
 } // namespace Step55
