@@ -943,7 +943,7 @@ void RightHandSide<dim>::vector_value(const Point<dim> &p,
 {
   const double R_x = p[0];
   const double R_y = p[1];
-  const double R_z = p[3];
+  const double R_z = p[2];
 
   const double pi  = numbers::PI;
   const double pi2 = pi * pi;
@@ -981,7 +981,7 @@ void ExactSolution<dim>::vector_value(const Point<dim> &p,
 {
   const double R_x = p[0];
   const double R_y = p[1];
-  const double R_z = p[3];
+  const double R_z = p[2];
 
   const double pi  = numbers::PI;
   const double pi2 = pi * pi;
@@ -1025,7 +1025,7 @@ void ExactSolution_v<dim>::vector_value(const Point<dim> &p,
 {
   const double R_x = p[0];
   const double R_y = p[1];
-  const double R_z = p[3];
+  const double R_z = p[2];
 
   const double pi  = numbers::PI;
   const double pi2 = pi * pi;
