@@ -1694,7 +1694,7 @@ void StokesProblem<dim>::solve()
 
   pcout << std::endl;
 
-  double dummy_val;
+  double dummy_val = 0.0;
   timer.restart();
   for (unsigned int i=0; i<n_scalar; ++i)
   {
