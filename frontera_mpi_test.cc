@@ -1463,6 +1463,7 @@ void StokesProblem<dim>::evaluate_viscosity ()
 {
   TimerOutput::Scope t(computing_timer, "3.evaluate_viscosity");
 
+  pcout << " evaluate_viscosity(): 1" << std::endl;
   {
     const QGauss<dim> quadrature_formula (velocity_degree+1);
 
@@ -1484,21 +1485,27 @@ void StokesProblem<dim>::evaluate_viscosity ()
     active_coef_dof_vec.compress(VectorOperation::insert);
   }
 
+  pcout << " evaluate_viscosity(): 2" << std::endl;
   stokes_matrix.fill_viscosities_and_pressure_scaling(active_coef_dof_vec,
                                                       1.0,
                                                       triangulation,
                                                       dof_handler_projection);
+  pcout << " evaluate_viscosity(): 3" << std::endl;
 
   velocity_matrix.fill_viscosities(active_coef_dof_vec,
                                    triangulation,
                                    dof_handler_projection,
                                    false);
+  pcout << " evaluate_viscosity(): 4" << std::endl;
 
   mass_matrix.fill_viscosities_and_pressure_scaling(active_coef_dof_vec,
                                                     1.0,
                                                     triangulation,
                                                     dof_handler_projection);
+  pcout << " evaluate_viscosity(): 5" << std::endl;
+
   mass_matrix.compute_diagonal();
+  pcout << " evaluate_viscosity(): 6" << std::endl;
 
 
   // Project to MG
@@ -1520,6 +1527,8 @@ void StokesProblem<dim>::evaluate_viscosity ()
                                         true);
     mg_matrices[level].compute_diagonal();
   }
+    pcout << " evaluate_viscosity(): 7" << std::endl;
+
 }
 
 
@@ -1875,9 +1884,13 @@ void StokesProblem<dim>::run(unsigned int n_cycles)
           << "   Setup DoFs timings:                 " << timer.last_wall_time() << std::endl;
 
     timer.restart();
+    pcout << " before assemble" << std::endl;
     assemble_system();
+    pcout << " before evaluate_viscosity" << std::endl;
     evaluate_viscosity();
+    pcout << " before correct_stokes_rhs" << std::endl;
     correct_stokes_rhs();
+
     timer.stop();
     pcout << "   Assemble System (RHS) timings:       " << timer.last_wall_time() << std::endl;
 
