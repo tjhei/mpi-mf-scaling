@@ -1896,6 +1896,10 @@ void StokesProblem<dim>::run(unsigned int n_cycles)
 
     solve();
 
+    Utilities::System::MemoryStats mem;
+    Utilities::System::get_memory_stats(mem);
+    pcout << "   VM Peak: " << Utilities::MPI::max(mem.VmPeak, MPI_COMM_WORLD) << std::endl;
+
     pcout << std::endl;
     computing_timer.print_summary();
     computing_timer.reset();
