@@ -1808,6 +1808,25 @@ void StokesProblem<dim>::solve()
 
   pcout << "   MPI send/receive Timings:        " << mpisend << std::endl;
 
+
+  {
+  const int my_size = 5;
+  std::vector<int> my_data(my_size);
+  my_data[0] = my_rank;
+  std::vector<int> recv_data(my_size*total_ranks);
+
+  timer.restart();
+  for (unsigned int i=0; i<n_prec; ++i)
+  {
+    MPI_Allgather(my_data.data(), my_size, MPI_INT, recv_data.data(), my_size, MPI_INT, MPI_COMM_WORLD);
+  }
+  timer.stop();
+  const double t = timer.last_wall_time()/n_prec;
+
+  pcout << "   MPI allgather Timings:        " << t << std::endl;
+   }
+
+
   pcout << std::endl;
 
 
