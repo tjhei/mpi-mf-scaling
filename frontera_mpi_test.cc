@@ -1044,7 +1044,7 @@ class StokesProblem
 public:
   StokesProblem(unsigned int velocity_degree);
 
-  void run();
+  void run(unsigned int n_cycles);
 
 private:
   void make_grid();
@@ -1858,6 +1858,10 @@ void StokesProblem<dim>::run()
 
 int main(int argc, char *argv[])
 {
+  unsigned int n_cycles = 5;
+  if (argc>1)
+    n_cycles = dealii::Utilities::string_to_int(argv[1]);
+
   try
   {
     using namespace dealii;
@@ -1866,7 +1870,7 @@ int main(int argc, char *argv[])
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
 
     StokesProblem<3> problem(2);
-    problem.run();
+    problem.run(n_cycles);
   }
   catch (std::exception &exc)
   {
