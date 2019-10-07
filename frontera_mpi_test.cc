@@ -1170,8 +1170,14 @@ void StokesProblem<dim>::setup_system()
   std::vector<unsigned int> stokes_sub_blocks(dim + 1, 0);
   stokes_sub_blocks[dim] = 1;
 
+
   {
-    TimerOutput::Scope t(computing_timer, "setup:renumber");
+    TimerOutput::Scope t(computing_timer, "setup:renumber-hierarchical");
+    DoFRenumbering::hierarchical(dof_handler);
+  }
+
+  {
+    TimerOutput::Scope t(computing_timer, "setup:renumber-component-wise");
     DoFRenumbering::component_wise(dof_handler, stokes_sub_blocks);
   }
 
@@ -1210,13 +1216,13 @@ void StokesProblem<dim>::setup_system()
     constraints.close();
   }
 
+  {
+    TimerOutput::Scope t(computing_timer, "setup:make-vectors");
   locally_relevant_solution.reinit(owned_partitioning,
                                    relevant_partitioning,
                                    mpi_communicator);
   system_rhs.reinit(owned_partitioning, mpi_communicator);
-
-
-
+  }
 
 
   // Velocity DoFHandler
@@ -1315,6 +1321,7 @@ void StokesProblem<dim>::setup_system()
 
   // ABlock matrix
   {
+    TimerOutput::Scope t(computing_timer, "setup:ablock");
     typename MatrixFree<dim,double>::AdditionalData additional_data;
     additional_data.tasks_parallel_scheme =
         MatrixFree<dim,double>::AdditionalData::none;
@@ -1331,6 +1338,7 @@ void StokesProblem<dim>::setup_system()
 
   // Mass matrix
   {
+    TimerOutput::Scope t(computing_timer, "setup:mass");
     typename MatrixFree<dim,double>::AdditionalData additional_data;
     additional_data.tasks_parallel_scheme =
         MatrixFree<dim,double>::AdditionalData::none;
@@ -1818,9 +1826,18 @@ void StokesProblem<dim>::refine_grid()
 
 
 template <int dim>
-void StokesProblem<dim>::run()
+void StokesProblem<dim>::run(unsigned int n_cycles)
 {
-  const unsigned int n_cycles = 5;
+  const unsigned int n_vect_doubles =
+    VectorizedArray<double>::n_array_elements;
+  const unsigned int n_vect_bits = 8 * sizeof(double) * n_vect_doubles;
+  pcout << "Vectorization over " << n_vect_doubles
+	<< " doubles = " << n_vect_bits << " bits ("
+	<< Utilities::System::get_current_vectorization_level()
+	<< "), VECTORIZATION_LEVEL=" << DEAL_II_COMPILER_VECTORIZATION_LEVEL
+	<< std::endl;
+  pcout << "running on " << Utilities::MPI::n_mpi_processes(mpi_communicator) << " ranks." << std::endl;
+
   for (unsigned int cycle = 0; cycle < n_cycles; ++cycle)
   {
     pcout << "Cycle " << cycle << ':' << std::endl;
