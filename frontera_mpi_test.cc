@@ -1044,10 +1044,11 @@ class StokesProblem
 public:
   StokesProblem(unsigned int velocity_degree);
 
-  void run(unsigned int n_cycles);
+  void run(unsigned int refine_start, unsigned int n_cycles_global,
+           unsigned int n_cycles_adaptive);
 
 private:
-  void make_grid();
+  void make_grid(unsigned int ref);
   void setup_system();
   void assemble_system();
 
@@ -1055,7 +1056,7 @@ private:
   void correct_stokes_rhs();
 
   void solve();
-  void refine_grid();
+  void refine_grid(bool global);
   void output_results(const unsigned int cycle) const;
 
   unsigned int velocity_degree;
@@ -1151,10 +1152,10 @@ StokesProblem<dim>::StokesProblem(unsigned int velocity_degree)
 
 
 template <int dim>
-void StokesProblem<dim>::make_grid()
+void StokesProblem<dim>::make_grid(unsigned int ref)
 {
   GridGenerator::hyper_cube(triangulation, -0.5, 1.5);
-  triangulation.refine_global(3);
+  triangulation.refine_global(ref);
 }
 
 template <int dim>
@@ -1717,6 +1718,7 @@ void StokesProblem<dim>::solve()
   }
 
 
+
   const unsigned int n_scalar = 1000;
   const unsigned int n_matvec = 100;
   const unsigned int n_prec = 10;
@@ -1844,17 +1846,34 @@ void StokesProblem<dim>::solve()
 
 
 template <int dim>
-void StokesProblem<dim>::refine_grid()
+void StokesProblem<dim>::refine_grid(bool global)
 {
   TimerOutput::Scope t(computing_timer, "6.refine");
 
-  triangulation.refine_global();
+  if (global)
+    triangulation.refine_global();
+  else
+    {
+      Vector<float> estimated_error_per_cell(triangulation.n_active_cells());
+      for (auto & cell: triangulation.active_cell_iterators())
+        {
+          if (cell->is_locally_owned())
+          estimated_error_per_cell(cell->active_cell_index())
+              = cell->center().norm();
+        }
+
+      parallel::distributed::GridRefinement::refine_and_coarsen_fixed_fraction(
+        triangulation, estimated_error_per_cell, 0.1428, 0.0);
+
+      triangulation.execute_coarsening_and_refinement();
+    }
 }
 
 
 
 template <int dim>
-void StokesProblem<dim>::run(unsigned int n_cycles)
+void StokesProblem<dim>::run(unsigned int refine_start, unsigned int n_cycles_global,
+                             unsigned int n_cycles_adaptive)
 {
   const unsigned int n_vect_doubles =
     VectorizedArray<double>::n_array_elements;
@@ -1866,14 +1885,33 @@ void StokesProblem<dim>::run(unsigned int n_cycles)
 	<< std::endl;
   pcout << "running on " << Utilities::MPI::n_mpi_processes(mpi_communicator) << " ranks." << std::endl;
 
-  for (unsigned int cycle = 0; cycle < n_cycles; ++cycle)
+
+  {
+    // dof estimate:
+
+    long long start_dofs = 30.21*std::pow(8.0,refine_start);
+    pcout << "estimate: " << std::endl;
+
+    for (unsigned int i=0;i<n_cycles_global;++i)
+      {
+        pcout << start_dofs << std::endl;
+        start_dofs*= 8;
+      }
+    for (unsigned int i=0;i<n_cycles_adaptive;++i)
+      {
+        pcout << start_dofs << std::endl;
+        start_dofs*= 2;
+      }
+  }
+
+  for (unsigned int cycle = 0; cycle < n_cycles_global+n_cycles_adaptive; ++cycle)
   {
     pcout << "Cycle " << cycle << ':' << std::endl;
 
     if (cycle == 0)
-      make_grid();
+      make_grid(refine_start);
     else
-      refine_grid();
+      refine_grid(cycle<=n_cycles_global);
 
     Timer timer(mpi_communicator,true);
 
@@ -1894,7 +1932,7 @@ void StokesProblem<dim>::run(unsigned int n_cycles)
     timer.stop();
     pcout << "   Assemble System (RHS) timings:       " << timer.last_wall_time() << std::endl;
 
-    solve();
+    //solve();
 
     Utilities::System::MemoryStats mem;
     Utilities::System::get_memory_stats(mem);
@@ -1911,9 +1949,16 @@ void StokesProblem<dim>::run(unsigned int n_cycles)
 
 int main(int argc, char *argv[])
 {
-  unsigned int n_cycles = 5;
-  if (argc>1)
-    n_cycles = dealii::Utilities::string_to_int(argv[1]);
+
+  if (argc!=4)
+  {
+    std::cout << "usage: start_refinements n_cycles_global n_cycles_adaptive" << std::endl;
+    return 1;
+  }
+
+  unsigned int refine_start = dealii::Utilities::string_to_int(argv[1]);
+  unsigned int n_cycles_global = dealii::Utilities::string_to_int(argv[2]);
+  unsigned int n_cycles_adaptive = dealii::Utilities::string_to_int(argv[3]);
 
   try
   {
@@ -1923,7 +1968,7 @@ int main(int argc, char *argv[])
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
 
     StokesProblem<3> problem(2);
-    problem.run(n_cycles);
+    problem.run(refine_start, n_cycles_global, n_cycles_adaptive);
   }
   catch (std::exception &exc)
   {
