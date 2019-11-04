@@ -1543,12 +1543,21 @@ void StokesProblem<dim>::correct_stokes_rhs()
   stokes_matrix.initialize_dof_vector(rhs_correction);
   stokes_matrix.initialize_dof_vector(u0);
 
-  rhs_correction.collect_sizes();
-  u0.collect_sizes();
+  //rhs_correction.collect_sizes();
+  //u0.collect_sizes();
 
   u0 = 0;
   rhs_correction = 0;
+
+  // TEMP: test if that works:
+  pcout << " correct_stokes_rhs(): distribute 1" << std::endl;
+  constraints_v.distribute(u0.block(0));
+  pcout << " correct_stokes_rhs(): distribute 2" << std::endl;
+  constraints_p.distribute(u0.block(1)]);
+  pcout << " correct_stokes_rhs(): distribute 3" << std::endl;
+
   constraints.distribute(u0);
+  pcout << " correct_stokes_rhs(): distribute 4" << std::endl;
   u0.update_ghost_values();
 
   const Table<2, VectorizedArray<double>> viscosity_x_2_table = stokes_matrix.get_viscosity_x_2_table();
