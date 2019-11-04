@@ -1553,7 +1553,7 @@ void StokesProblem<dim>::correct_stokes_rhs()
   pcout << " correct_stokes_rhs(): distribute 1" << std::endl;
   constraints_v.distribute(u0.block(0));
   pcout << " correct_stokes_rhs(): distribute 2" << std::endl;
-  constraints_p.distribute(u0.block(1)]);
+  constraints_p.distribute(u0.block(1));
   pcout << " correct_stokes_rhs(): distribute 3" << std::endl;
 
   constraints.distribute(u0);
