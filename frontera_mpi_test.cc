@@ -1187,7 +1187,7 @@ void StokesProblem<dim>::setup_system()
                                  dofs_per_block,
                                  stokes_sub_blocks);
 
-  const unsigned int n_u = dofs_per_block[0], n_p = dofs_per_block[1];
+  const types::global_dof_index n_u = dofs_per_block[0], n_p = dofs_per_block[1];
 
   pcout << "   Number of degrees of freedom: " << dof_handler.n_dofs() << " ("
         << n_u << '+' << n_p << ')' << std::endl;
