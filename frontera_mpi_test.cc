@@ -1556,8 +1556,32 @@ void StokesProblem<dim>::correct_stokes_rhs()
   constraints_p.distribute(u0.block(1));
   pcout << " correct_stokes_rhs(): distribute 3" << std::endl;
 
-  constraints.distribute(u0);
+  {
+    IndexSet i1 = u0.block(0).locally_owned_elements();
+    IndexSet i2 = u0.locally_owned_elements().get_view(0, 0+u0.block(0).size());
+    if (i1 != i2)
+      {
+	std::cout << "error b0:\n";
+	i1.print(std::cout);
+	i2.print(std::cout);
+      }
+  }
+  {
+    IndexSet i1 = u0.block(1).locally_owned_elements();
+    types::global_dof_index block_start = u0.block(0).size();
+    IndexSet i2 = u0.locally_owned_elements().get_view(block_start, block_start+u0.block(1).size());
+    if (i1 != i2)
+      {
+	std::cout << "error b1:\n";
+	i1.print(std::cout);
+	i2.print(std::cout);
+      }
+  }
+
   pcout << " correct_stokes_rhs(): distribute 4" << std::endl;
+
+  constraints.distribute(u0);
+  pcout << " correct_stokes_rhs(): distribute 5" << std::endl;
   u0.update_ghost_values();
 
   const Table<2, VectorizedArray<double>> viscosity_x_2_table = stokes_matrix.get_viscosity_x_2_table();
